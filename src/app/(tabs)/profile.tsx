@@ -1,28 +1,40 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const [userName, setUserName] = useState('Janaka Ekanayake');
   const [userEmail, setUserEmail] = useState('janaka.rehab@gmail.com');
-  const [profileImg, setProfileImg] = useState('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100');
+  const [profileImg, setProfileImg] = useState<string | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
 
   const [tempName, setTempName] = useState(userName);
   const [tempEmail, setTempEmail] = useState(userEmail);
-  const [tempImg, setTempImg] = useState(profileImg);
 
-  // 21-Day Timeline data (3 weeks x 7 days)
-  // Let's say 14 days are completed out of 21
+  const totalCleanDays = 59;
+
   const timelineDays = Array.from({ length: 21 }, (_, index) => ({
     day: index + 1,
-    completed: index < 14, // first 14 days completed
+    completed: index < 14,
   }));
+
+  const pickImageFromGallery = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setProfileImg(result.assets[0].uri);
+    }
+  };
 
   const handleSaveProfile = () => {
     setUserName(tempName);
     setUserEmail(tempEmail);
-    setProfileImg(tempImg);
     setEditModalVisible(false);
   };
 
@@ -30,22 +42,32 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <View style={styles.bigAvatar}>
-          <Ionicons name="person" size={40} color="#174C3C" />
-        </View>
+        <Pressable onPress={pickImageFromGallery} style={styles.avatarContainer}>
+          {profileImg ? (
+            <Image source={{ uri: profileImg }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.bigAvatar}>
+              <Ionicons name="person" size={40} color="#174C3C" />
+            </View>
+          )}
+          <View style={styles.cameraBadge}>
+            <Ionicons name="camera" size={12} color="#FFFFFF" />
+          </View>
+        </Pressable>
+
         <Text style={styles.name}>{userName}</Text>
         <Text style={styles.email}>{userEmail}</Text>
 
-        <Pressable style={styles.editBtn} onPress={() => { setTempName(userName); setTempEmail(userEmail); setTempImg(profileImg); setEditModalVisible(true); }}>
+        <Pressable style={styles.editBtn} onPress={() => { setTempName(userName); setTempEmail(userEmail); setEditModalVisible(true); }}>
           <Ionicons name="create-outline" size={16} color="#FFFFFF" />
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </Pressable>
       </View>
 
-      {/* 21-Day Timeline Progress Chart */}
+      {/* Clean Days & Timeline Card */}
       <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>21-Day Recovery Timeline Progress 📊</Text>
-        <Text style={styles.timelineSub}>Week 1, Week 2 & Week 3 Milestones</Text>
+        <Text style={styles.statsTitle}>Total Clean Days: {totalCleanDays} Days 🌟</Text>
+        <Text style={styles.timelineSub}>21-Day Recovery Milestone Progress</Text>
         
         <View style={styles.timelineGrid}>
           {timelineDays.map((item) => (
@@ -68,10 +90,12 @@ export default function ProfileScreen() {
             <TextInput style={styles.input} value={tempName} onChangeText={setTempName} />
 
             <Text style={styles.inputLabel}>Email Address</Text>
-            <TextInput style={styles.input} value={tempEmail} onChangeText={setTempEmail} />
+            <TextInput style={styles.input} value={tempEmail} onChangeText={setUserEmail} />
 
-            <Text style={styles.inputLabel}>Profile Photo URL</Text>
-            <TextInput style={styles.input} value={tempImg} onChangeText={setTempImg} />
+            <Pressable style={styles.galleryBtn} onPress={pickImageFromGallery}>
+              <Ionicons name="image-outline" size={18} color="#174C3C" />
+              <Text style={styles.galleryBtnText}>Select Photo from Gallery</Text>
+            </Pressable>
 
             <View style={styles.modalActions}>
               <Pressable style={styles.saveBtn} onPress={handleSaveProfile}><Text style={styles.saveBtnText}>Save</Text></Pressable>
@@ -87,13 +111,16 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F8F5', padding: 16, paddingTop: 50 },
   profileHeader: { alignItems: 'center', marginBottom: 20 },
-  bigAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#E2ECE9', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  avatarContainer: { position: 'relative', marginBottom: 10 },
+  bigAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#E2ECE9', justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: 84, height: 84, borderRadius: 42 },
+  cameraBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#174C3C', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   name: { fontSize: 20, fontWeight: 'bold', color: '#174C3C' },
   email: { fontSize: 13, color: '#666', marginBottom: 10 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#174C3C', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20 },
   editBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
   statsCard: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 14, marginBottom: 20, elevation: 1 },
-  statsTitle: { fontSize: 15, fontWeight: 'bold', color: '#174C3C', marginBottom: 4 },
+  statsTitle: { fontSize: 16, fontWeight: 'bold', color: '#174C3C', marginBottom: 4 },
   timelineSub: { fontSize: 12, color: '#666', marginBottom: 15 },
   timelineGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 15 },
   timelineNode: { width: 42, height: 42, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
@@ -106,7 +133,9 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#174C3C', marginBottom: 15 },
   inputLabel: { fontSize: 12, color: '#666', marginBottom: 4, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: '#E2ECE9', padding: 10, borderRadius: 8, marginBottom: 14, fontSize: 14 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
+  galleryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#174C3C', padding: 10, borderRadius: 8, marginBottom: 15, backgroundColor: '#E2ECE9' },
+  galleryBtnText: { color: '#174C3C', fontWeight: 'bold', fontSize: 13 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   saveBtn: { backgroundColor: '#174C3C', paddingVertical: 8, paddingHorizontal: 18, borderRadius: 6 },
   saveBtnText: { color: '#FFFFFF', fontWeight: 'bold' },
   cancelBtn: { paddingVertical: 8, paddingHorizontal: 12 },

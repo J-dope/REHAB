@@ -1,29 +1,31 @@
 import { Stack } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import React from 'react';
 
+// Conditional import to prevent web crashes
+let Notifications: any = null;
 if (Platform.OS !== 'web') {
+  Notifications = require('expo-notifications');
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,
-    } as any),
+    }),
   });
 }
 
 export default function RootLayout() {
-  const appState = useRef<any>(AppState.currentState);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && Notifications) {
       Notifications.requestPermissionsAsync();
 
       const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-        if (appState.current && appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
           triggerRecoveryNotification();
         }
         appState.current = nextAppState;
@@ -34,7 +36,7 @@ export default function RootLayout() {
   }, []);
 
   const triggerRecoveryNotification = async () => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && Notifications) {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "Welcome Back to REHAB 💪",
