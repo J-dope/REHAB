@@ -4,7 +4,6 @@ import { AppState, AppStateStatus, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import React from 'react';
 
-// Web වලදී notification errors නොඑන්න safe handler එකක් දීම
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -20,7 +19,6 @@ export default function RootLayout() {
   const appState = useRef<any>(AppState.currentState);
 
   useEffect(() => {
-    // Web වලදී permissions ඉල්ලීම අවශ්‍ය නැත
     if (Platform.OS !== 'web') {
       Notifications.requestPermissionsAsync();
 
