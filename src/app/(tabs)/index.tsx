@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAppTheme } from '../_layout';
 
 interface HabitItem {
   id: string;
@@ -25,11 +26,12 @@ interface PinnedRehab {
 }
 
 export default function HomeScreen() {
+  const { isDarkMode } = useAppTheme();
+
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [moodModalVisible, setMoodModalVisible] = useState(false);
-  const baseCleanDays = 45;
 
-  // 1. Pinned Special Counter State
+  // Pinned Special Counter State
   const [pinnedRehab, setPinnedRehab] = useState<PinnedRehab>({
     title: 'Short-Form Videos Free',
     startDate: '2026-11-15T00:00:00',
@@ -56,9 +58,9 @@ export default function HomeScreen() {
   const [pinnedDate, setPinnedDate] = useState(new Date(pinnedRehab.startDate));
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // 2. Habits State
+  // Habits State
   const [habits, setHabits] = useState<HabitItem[]>([
-    { id: '1', title: 'Morning Meditation', dailyTime: '15 mins', targetDate: '2026-12-31', completedToday: true },
+    { id: '1', title: 'Morning Meditation', dailyTime: '15 mins', targetDate: '2026-12-31', completedToday: false },
   ]);
   const [habitModalVisible, setHabitModalVisible] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
@@ -66,19 +68,27 @@ export default function HomeScreen() {
   const [habitTime, setHabitTime] = useState('');
   const [habitTarget, setHabitTarget] = useState('');
 
-  // 3. Rehab Programs State
+  // Rehab Programs State
   const [rehabs, setRehabs] = useState<RehabItem[]>([
-    { id: '1', title: 'Substance Recovery Phase 1', targetDate: '2026-12-15', startDate: '2026-11-01', completedToday: true },
+    { id: '1', title: 'Substance Recovery Phase 1', targetDate: '2026-12-15', startDate: '2026-11-01', completedToday: false },
   ]);
   const [rehabModalVisible, setRehabModalVisible] = useState(false);
   const [editingRehabId, setEditingRehabId] = useState<string | null>(null);
   const [rehabTitle, setRehabTitle] = useState('');
   const [rehabTarget, setRehabTarget] = useState('');
 
-  // 4. Daily Questionnaire State (Bottom of Home)
-  const [avoidedRehab, setAvoidedRehab] = useState<boolean | null>(true);
-  const [completedHabitsToday, setCompletedHabitsToday] = useState<boolean | null>(true);
-  const [quizSubmitted, setQuizSubmitted] = useState(true);
+  // Daily Questionnaire Modal State
+  const [quizModalVisible, setQuizModalVisible] = useState(false);
+  const [avoidedRehab, setAvoidedRehab] = useState<boolean | null>(null);
+  const [resistedStrongUrges, setResistedStrongUrges] = useState<boolean | null>(null);
+  const [completedHabitsToday, setCompletedHabitsToday] = useState<boolean | null>(null);
+  const [followedRoutine, setFollowedRoutine] = useState<boolean | null>(null);
+
+  // 21-Day Timeline data
+  const timelineDays = Array.from({ length: 21 }, (_, index) => ({
+    day: index + 1,
+    completed: index < Math.min(21, timeElapsed.days),
+  }));
 
   const moods = [
     { id: '1', emoji: '😡', label: 'Angry' },
@@ -87,22 +97,38 @@ export default function HomeScreen() {
     { id: '4', emoji: '😊', label: 'Happy' },
   ];
 
-  // Global Progress Calculation based on Questionnaire & Items
-  const calculateGlobalProgress = () => {
-    let totalItems = habits.length + rehabs.length;
-    if (totalItems === 0) return 100;
-    
-    let completedItems = habits.filter(h => h.completedToday).length + rehabs.filter(r => r.completedToday).length;
-    let quizBonus = (avoidedRehab ? 50 : 0) + (completedHabitsToday ? 50 : 0);
-    
-    let itemScore = (completedItems / totalItems) * 50;
-    let finalScore = Math.round(itemScore + (quizBonus * 0.5));
-    return Math.min(100, Math.max(0, finalScore));
+  const calculateRehabProgress = () => {
+    let quizScore = 0;
+    if (avoidedRehab === true) quizScore += 35;
+    if (resistedStrongUrges === true) quizScore += 35;
+
+    let itemScore = 0;
+    if (rehabs.length > 0) {
+      const done = rehabs.filter(r => r.completedToday).length;
+      itemScore = (done / rehabs.length) * 30;
+    } else {
+      itemScore = 30;
+    }
+    return Math.min(100, Math.round(quizScore + itemScore));
   };
 
-  const globalProgress = calculateGlobalProgress();
+  const calculateHabitProgress = () => {
+    let quizScore = 0;
+    if (completedHabitsToday === true) quizScore += 35;
+    if (followedRoutine === true) quizScore += 35;
 
-  const totalCleanDays = baseCleanDays + timeElapsed.days;
+    let itemScore = 0;
+    if (habits.length > 0) {
+      const done = habits.filter(h => h.completedToday).length;
+      itemScore = (done / habits.length) * 30;
+    } else {
+      itemScore = 30;
+    }
+    return Math.min(100, Math.round(quizScore + itemScore));
+  };
+
+  const rehabProgress = calculateRehabProgress();
+  const habitProgress = calculateHabitProgress();
 
   const toggleHabitToday = (id: string) => {
     setHabits(habits.map(h => h.id === id ? { ...h, completedToday: !h.completedToday } : h));
@@ -146,165 +172,236 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* 1. Main Clean Days Hero Card */}
-      <View style={styles.heroCard}>
-        <Text style={styles.heroSub}>REHAB - Recovery Journey</Text>
-        <Text style={styles.heroTitle}>{totalCleanDays} Days Clean</Text>
-        <Text style={styles.heroDesc}>Overall Progress: {globalProgress}% Completed Today</Text>
-        
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${globalProgress}%` }]} />
+    <ScrollView style={[styles.container, isDarkMode ? styles.darkBg : styles.lightBg]} showsVerticalScrollIndicator={false}>
+      {/* 1. Daily Check-in Questionnaire Banner */}
+      <Pressable style={[styles.quizTriggerBanner, isDarkMode ? styles.darkCard : styles.lightBanner]} onPress={() => setQuizModalVisible(true)}>
+        <View style={styles.quizBannerLeft}>
+          <View style={styles.quizIconCircle}>
+            <Ionicons name="clipboard-outline" size={22} color="#0F766E" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.quizBannerTitle, isDarkMode ? styles.textWhite : styles.textDark]}>Daily Check-in Questionnaire</Text>
+            <Text style={styles.quizBannerSub}>Tap to answer questions & update progress scores</Text>
+          </View>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={18} color="#0F766E" />
+      </Pressable>
 
-      {/* 2. Special Pinned Rehab Live Counter */}
-      <View style={styles.pinnedContainer}>
+      {/* 2. Special Pinned Counter - HUGE DAYS HIGHLIGHT */}
+      <View style={[styles.pinnedContainer, isDarkMode ? styles.darkCard : styles.lightCard]}>
         <View style={styles.pinnedHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="time-outline" size={16} color="#174C3C" />
-            <Text style={styles.pinnedTitle}>{pinnedRehab.title}</Text>
+            <Ionicons name="shield-checkmark" size={18} color="#7C3AED" />
+            <Text style={[styles.pinnedTitle, isDarkMode ? styles.textPurple : styles.textDark]}>{pinnedRehab.title}</Text>
           </View>
           <Pressable onPress={() => { setTempPinnedTitle(pinnedRehab.title); setEditPinnedModal(true); }}>
-            <Ionicons name="settings-outline" size={16} color="#174C3C" />
+            <Ionicons name="settings-outline" size={18} color="#7C3AED" />
           </Pressable>
         </View>
 
-        <Text style={styles.pinnedSub}>I've been free for:</Text>
+        <View style={styles.hugeDaysCard}>
+          <Text style={styles.hugeDaysNumber}>{timeElapsed.days}</Text>
+          <Text style={styles.hugeDaysLabel}>DAYS CLEAN / FREE</Text>
+        </View>
 
         <View style={styles.timeBoxRow}>
-          <View style={styles.timeBox}>
-            <Text style={styles.timeNum}>{timeElapsed.days}</Text>
-            <Text style={styles.timeLbl}>days</Text>
-          </View>
-          <View style={styles.timeBox}>
-            <Text style={styles.timeNum}>{timeElapsed.hours}</Text>
+          <View style={[styles.timeBoxBlue, isDarkMode && styles.darkSubCard]}>
+            <Text style={[styles.timeNum, isDarkMode ? styles.textWhite : styles.textDark]}>{timeElapsed.hours}</Text>
             <Text style={styles.timeLbl}>hours</Text>
           </View>
-          <View style={styles.timeBox}>
-            <Text style={styles.timeNum}>{timeElapsed.minutes}</Text>
+          <View style={[styles.timeBoxPurple, isDarkMode && styles.darkSubCard]}>
+            <Text style={[styles.timeNum, isDarkMode ? styles.textWhite : styles.textDark]}>{timeElapsed.minutes}</Text>
             <Text style={styles.timeLbl}>mins</Text>
           </View>
         </View>
       </View>
 
       {/* 3. Mood Tracker */}
-      <Text style={styles.sectionTitle}>How do you feel today?</Text>
+      <Text style={[styles.sectionTitle, isDarkMode ? styles.textLightGreen : styles.textDark]}>How do you feel today?</Text>
       <View style={styles.moodContainer}>
         {moods.map((m) => (
           <Pressable 
             key={m.id} 
-            style={[styles.moodCard, selectedMood === m.label && styles.selectedMoodCard]}
+            style={[styles.moodCard, isDarkMode ? styles.darkCard : styles.lightCard, selectedMood === m.label && styles.selectedMoodCard]}
             onPress={() => { setSelectedMood(m.label); setMoodModalVisible(true); }}
           >
             <Text style={styles.moodEmoji}>{m.emoji}</Text>
-            <Text style={styles.moodLabel}>{m.label}</Text>
+            <Text style={[styles.moodLabel, isDarkMode ? styles.textWhite : styles.textDark]}>{m.label}</Text>
           </Pressable>
         ))}
       </View>
 
-      {/* 4. Habit Tracker Section */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Habit Tracker (Did you do it?)</Text>
-        <Pressable style={styles.addPlusBtn} onPress={() => { setEditingHabitId(null); setHabitTitle(''); setHabitTime(''); setHabitTarget(''); setHabitModalVisible(true); }}>
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-        </Pressable>
-      </View>
-
-      <View style={styles.listContainer}>
-        {habits.map((h) => (
-          <View key={h.id} style={styles.habitCard}>
-            <Pressable onPress={() => toggleHabitToday(h.id)} style={[styles.checkBox, h.completedToday && styles.checkedBox]}>
-              {h.completedToday && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-            </Pressable>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[styles.cardTitle, h.completedToday && styles.completedText]}>{h.title}</Text>
-              <Text style={styles.cardSub}>Daily: {h.dailyTime} • Target: {h.targetDate}</Text>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable onPress={() => { setEditingHabitId(h.id); setHabitTitle(h.title); setHabitTime(h.dailyTime); setHabitTarget(h.targetDate); setHabitModalVisible(true); }}>
-                <Ionicons name="create-outline" size={18} color="#174C3C" style={{ marginRight: 8 }} />
-              </Pressable>
-              <Pressable onPress={() => handleDeleteHabit(h.id)}>
-                <Ionicons name="trash-outline" size={18} color="#D9534F" />
-              </Pressable>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* 5. Rehab Programs Section */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Rehab Programs (Did you avoid it?)</Text>
-        <Pressable style={styles.addPlusBtn} onPress={() => { setEditingRehabId(null); setRehabTitle(''); setRehabTarget(''); setRehabModalVisible(true); }}>
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-        </Pressable>
-      </View>
-
-      <View style={styles.listContainer}>
-        {rehabs.map((r) => (
-          <View key={r.id} style={styles.rehabCard}>
-            <Pressable onPress={() => toggleRehabToday(r.id)} style={[styles.checkBoxWhite, r.completedToday && styles.checkedBoxWhite]}>
-              {r.completedToday && <Ionicons name="checkmark" size={14} color="#174C3C" />}
-            </Pressable>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[styles.rehabTitle, r.completedToday && styles.completedTextWhite]}>{r.title}</Text>
-              <Text style={styles.rehabSub}>Target Date: {r.targetDate}</Text>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable onPress={() => { setEditingRehabId(r.id); setRehabTitle(r.title); setRehabTarget(r.targetDate); setRehabModalVisible(true); }}>
-                <Ionicons name="create-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              </Pressable>
-              <Pressable onPress={() => handleDeleteRehab(r.id)}>
-                <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
-              </Pressable>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* 6. Daily Questionnaire Section at Bottom */}
-      <View style={styles.quizCard}>
-        <Text style={styles.sectionTitle}>Daily Recovery Questionnaire 📋</Text>
+      {/* 4. BALANCED SECTIONS: Rehab vs Habit */}
+      <View style={styles.balancedRow}>
         
-        <Text style={styles.quizQuestion}>1. Rehab: Did you successfully avoid bad urges today?</Text>
-        <View style={styles.quizRow}>
-          <Pressable style={[styles.quizBtn, avoidedRehab === true && styles.quizBtnSelected]} onPress={() => setAvoidedRehab(true)}>
-            <Text style={[styles.quizBtnText, avoidedRehab === true && styles.quizBtnTextSelected]}>Yes</Text>
-          </Pressable>
-          <Pressable style={[styles.quizBtn, avoidedRehab === false && styles.quizBtnSelected]} onPress={() => setAvoidedRehab(false)}>
-            <Text style={[styles.quizBtnText, avoidedRehab === false && styles.quizBtnTextSelected]}>No</Text>
-          </Pressable>
+        {/* REHAB SECTION */}
+        <View style={styles.splitBoxRehab}>
+          <View style={styles.splitHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.splitTitleWhite}>Rehab Programs</Text>
+              <Text style={styles.splitSubGold}>Avoidance Progress: {rehabProgress}%</Text>
+            </View>
+            <Pressable style={styles.addBtnGold} onPress={() => { setEditingRehabId(null); setRehabTitle(''); setRehabTarget(''); setRehabModalVisible(true); }}>
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View style={styles.progBgWhite}>
+            <View style={[styles.progFillGold, { width: `${rehabProgress}%` }]} />
+          </View>
+
+          <View style={styles.itemList}>
+            {rehabs.map((r) => (
+              <View key={r.id} style={styles.itemCardRehab}>
+                <Pressable onPress={() => toggleRehabToday(r.id)} style={[styles.checkBoxWhite, r.completedToday && styles.checkedWhite]}>
+                  {r.completedToday && <Ionicons name="checkmark" size={12} color="#065F46" />}
+                </Pressable>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={[styles.itemTextWhite, r.completedToday && styles.crossedText]} numberOfLines={1}>{r.title}</Text>
+                  <Text style={styles.itemSubLight}>Target: {r.targetDate}</Text>
+                </View>
+                <View style={styles.actionIcons}>
+                  <Pressable onPress={() => { setEditingRehabId(r.id); setRehabTitle(r.title); setRehabTarget(r.targetDate); setRehabModalVisible(true); }}>
+                    <Ionicons name="create-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  </Pressable>
+                  <Pressable onPress={() => handleDeleteRehab(r.id)}>
+                    <Ionicons name="trash-outline" size={16} color="#FCA5A5" />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <Text style={styles.quizQuestion}>2. Habits: Did you complete your daily positive habits?</Text>
-        <View style={styles.quizRow}>
-          <Pressable style={[styles.quizBtn, completedHabitsToday === true && styles.quizBtnSelected]} onPress={() => setCompletedHabitsToday(true)}>
-            <Text style={[styles.quizBtnText, completedHabitsToday === true && styles.quizBtnTextSelected]}>Yes</Text>
-          </Pressable>
-          <Pressable style={[styles.quizBtn, completedHabitsToday === false && styles.quizBtnSelected]} onPress={() => setCompletedHabitsToday(false)}>
-            <Text style={[styles.quizBtnText, completedHabitsToday === false && styles.quizBtnTextSelected]}>No</Text>
-          </Pressable>
+        {/* HABIT SECTION */}
+        <View style={styles.splitBoxHabit}>
+          <View style={styles.splitHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.splitTitleDark}>Habit Tracker</Text>
+              <Text style={styles.splitSubBlue}>Routine Progress: {habitProgress}%</Text>
+            </View>
+            <Pressable style={styles.addBtnBlue} onPress={() => { setEditingHabitId(null); setHabitTitle(''); setHabitTime(''); setHabitTarget(''); setHabitModalVisible(true); }}>
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View style={styles.progBgBlue}>
+            <View style={[styles.progFillBlue, { width: `${habitProgress}%` }]} />
+          </View>
+
+          <View style={styles.itemList}>
+            {habits.map((h) => (
+              <View key={h.id} style={styles.itemCardHabit}>
+                <Pressable onPress={() => toggleHabitToday(h.id)} style={[styles.checkBoxBlue, h.completedToday && styles.checkedBlue]}>
+                  {h.completedToday && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
+                </Pressable>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={[styles.itemTextDark, h.completedToday && styles.crossedTextDark]} numberOfLines={1}>{h.title}</Text>
+                  <Text style={styles.itemSubGray}>Daily: {h.dailyTime}</Text>
+                </View>
+                <View style={styles.actionIcons}>
+                  <Pressable onPress={() => { setEditingHabitId(h.id); setHabitTitle(h.title); setHabitTime(h.dailyTime); setHabitTarget(h.targetDate); setHabitModalVisible(true); }}>
+                    <Ionicons name="create-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  </Pressable>
+                  <Pressable onPress={() => handleDeleteHabit(h.id)}>
+                    <Ionicons name="trash-outline" size={16} color="#FCA5A5" />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <Pressable style={styles.submitQuizBtn} onPress={() => setQuizSubmitted(true)}>
-          <Text style={styles.submitQuizText}>Update Daily Progress Score ✓</Text>
-        </Pressable>
-        {quizSubmitted && <Text style={styles.quizSuccess}>Progress updated successfully!</Text>}
       </View>
 
-      {/* Modals */}
+      {/* 5. 21-Day Timeline Progress Card */}
+      <View style={[styles.statsCard, isDarkMode ? styles.darkCard : styles.lightCard]}>
+        <Text style={[styles.statsTitle, isDarkMode ? styles.textWhite : styles.textDark]}>21-Day Recovery Milestone Progress 📊</Text>
+        <Text style={styles.timelineSub}>Week 1, Week 2 & Week 3 Milestones</Text>
+        
+        <View style={styles.timelineGrid}>
+          {timelineDays.map((item) => (
+            <View key={item.day} style={[styles.timelineNode, item.completed ? styles.nodeCompleted : (isDarkMode ? styles.darkNode : styles.nodePending)]}>
+              <Text style={[styles.nodeText, item.completed && { color: '#FFFFFF' }]}>D{item.day}</Text>
+              {item.completed && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+            </View>
+          ))}
+        </View>
+        <Text style={styles.progressText}>{Math.min(21, timeElapsed.days)} / 21 Days Completed Successfully!</Text>
+      </View>
+
+      {/* Daily Questionnaire Modal */}
+      <Modal visible={quizModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, isDarkMode ? styles.textWhite : styles.textDark]}>Daily Check-in 📋</Text>
+              <Pressable onPress={() => setQuizModalVisible(false)}>
+                <Ionicons name="close" size={22} color={isDarkMode ? '#FFF' : '#666'} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.quizCategoryTag}>REHAB QUESTIONS</Text>
+            <Text style={[styles.quizQuestion, isDarkMode ? styles.textWhite : styles.textDark]}>1. Did you avoid all bad habits / substances today?</Text>
+            <View style={styles.quizRow}>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, avoidedRehab === true && styles.quizBtnGreen]} onPress={() => setAvoidedRehab(true)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, avoidedRehab === true && styles.quizBtnTextSelected]}>Yes</Text>
+              </Pressable>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, avoidedRehab === false && styles.quizBtnRed]} onPress={() => setAvoidedRehab(false)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, avoidedRehab === false && styles.quizBtnTextSelected]}>No</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.quizQuestion}>2. Did you successfully resist strong urges today?</Text>
+            <View style={styles.quizRow}>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, resistedStrongUrges === true && styles.quizBtnGreen]} onPress={() => setResistedStrongUrges(true)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, resistedStrongUrges === true && styles.quizBtnTextSelected]}>Yes</Text>
+              </Pressable>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, resistedStrongUrges === false && styles.quizBtnRed]} onPress={() => setResistedStrongUrges(false)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, resistedStrongUrges === false && styles.quizBtnTextSelected]}>No</Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.quizCategoryTag, { color: '#059669', marginTop: 8 }]}>HABIT QUESTIONS</Text>
+            <Text style={[styles.quizQuestion, isDarkMode ? styles.textWhite : styles.textDark]}>3. Did you complete your positive daily habits?</Text>
+            <View style={styles.quizRow}>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, completedHabitsToday === true && styles.quizBtnBlue]} onPress={() => setCompletedHabitsToday(true)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, completedHabitsToday === true && styles.quizBtnTextSelected]}>Yes</Text>
+              </Pressable>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, completedHabitsToday === false && styles.quizBtnRed]} onPress={() => setCompletedHabitsToday(false)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, completedHabitsToday === false && styles.quizBtnTextSelected]}>No</Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.quizQuestion, isDarkMode ? styles.textWhite : styles.textDark]}>4. Did you stay consistent with your schedule?</Text>
+            <View style={styles.quizRow}>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, followedRoutine === true && styles.quizBtnBlue]} onPress={() => setFollowedRoutine(true)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, followedRoutine === true && styles.quizBtnTextSelected]}>Yes</Text>
+              </Pressable>
+              <Pressable style={[styles.quizBtn, isDarkMode && styles.darkSubCard, followedRoutine === false && styles.quizBtnRed]} onPress={() => setFollowedRoutine(false)}>
+                <Text style={[styles.quizBtnText, isDarkMode && styles.textWhite, followedRoutine === false && styles.quizBtnTextSelected]}>No</Text>
+              </Pressable>
+            </View>
+
+            <Pressable style={styles.submitQuizBtn} onPress={() => setQuizModalVisible(false)}>
+              <Text style={styles.submitQuizText}>Submit & Update Scores ✓</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Configure Pinned Rehab Modal */}
       <Modal visible={editPinnedModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Configure Pinned Counter</Text>
+          <View style={[styles.modalContent, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <Text style={[styles.modalTitle, isDarkMode ? styles.textWhite : styles.textDark]}>Configure Pinned Counter</Text>
             <Text style={styles.inputLabel}>Title</Text>
-            <TextInput style={styles.input} value={tempPinnedTitle} onChangeText={setTempPinnedTitle} />
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} value={tempPinnedTitle} onChangeText={setTempPinnedTitle} />
 
             <Text style={styles.inputLabel}>Select Start Date (Calendar)</Text>
-            <Pressable style={styles.calendarTriggerBtn} onPress={() => setShowDatePicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color="#174C3C" />
-              <Text style={styles.calendarTriggerText}>{pinnedDate.toISOString().split('T')[0]}</Text>
+            <Pressable style={[styles.calendarTriggerBtn, isDarkMode && styles.darkSubCard]} onPress={() => setShowDatePicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+              <Text style={[styles.calendarTriggerText, isDarkMode && styles.textWhite]}>{pinnedDate.toISOString().split('T')[0]}</Text>
             </Pressable>
 
             {showDatePicker && (
@@ -326,13 +423,14 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Habit Modal */}
       <Modal visible={habitModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingHabitId ? 'Edit Habit' : 'Add New Habit'}</Text>
-            <TextInput style={styles.input} placeholder="Habit Title" value={habitTitle} onChangeText={setHabitTitle} />
-            <TextInput style={styles.input} placeholder="Daily Time (e.g. 15 mins)" value={habitTime} onChangeText={setHabitTime} />
-            <TextInput style={styles.input} placeholder="Target Date (YYYY-MM-DD)" value={habitTarget} onChangeText={setHabitTarget} />
+          <View style={[styles.modalContent, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <Text style={[styles.modalTitle, isDarkMode ? styles.textWhite : styles.textDark]}>{editingHabitId ? 'Edit Habit' : 'Add New Habit'}</Text>
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} placeholder="Habit Title" placeholderTextColor="#888" value={habitTitle} onChangeText={setHabitTitle} />
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} placeholder="Daily Time (e.g. 15 mins)" placeholderTextColor="#888" value={habitTime} onChangeText={setHabitTime} />
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} placeholder="Target Date (YYYY-MM-DD)" placeholderTextColor="#888" value={habitTarget} onChangeText={setHabitTarget} />
             <View style={styles.modalActions}>
               <Pressable style={styles.primaryBtn} onPress={handleSaveHabit}><Text style={styles.btnText}>Save</Text></Pressable>
               <Pressable style={styles.cancelBtn} onPress={() => setHabitModalVisible(false)}><Text style={styles.cancelText}>Cancel</Text></Pressable>
@@ -341,12 +439,13 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Rehab Modal */}
       <Modal visible={rehabModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingRehabId ? 'Edit Rehab' : 'Add Rehab Program'}</Text>
-            <TextInput style={styles.input} placeholder="Rehab Title" value={rehabTitle} onChangeText={setRehabTitle} />
-            <TextInput style={styles.input} placeholder="Target Date (YYYY-MM-DD)" value={rehabTarget} onChangeText={setRehabTarget} />
+          <View style={[styles.modalContent, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <Text style={[styles.modalTitle, isDarkMode ? styles.textWhite : styles.textDark]}>{editingRehabId ? 'Edit Rehab' : 'Add Rehab Program'}</Text>
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} placeholder="Rehab Title" placeholderTextColor="#888" value={rehabTitle} onChangeText={setRehabTitle} />
+            <TextInput style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]} placeholder="Target Date (YYYY-MM-DD)" placeholderTextColor="#888" value={rehabTarget} onChangeText={setRehabTarget} />
             <View style={styles.modalActions}>
               <Pressable style={styles.primaryBtn} onPress={handleSaveRehab}><Text style={styles.btnText}>Save</Text></Pressable>
               <Pressable style={styles.cancelBtn} onPress={() => setRehabModalVisible(false)}><Text style={styles.cancelText}>Cancel</Text></Pressable>
@@ -355,11 +454,12 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Mood Logged Modal */}
       <Modal visible={moodModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContentSmall}>
-            <Text style={styles.modalTitle}>Mood Recorded!</Text>
-            <Text style={styles.modalBody}>You selected: <Text style={{fontWeight: 'bold'}}>{selectedMood}</Text>.</Text>
+          <View style={[styles.modalContentSmall, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <Text style={[styles.modalTitle, isDarkMode ? styles.textWhite : styles.textDark]}>Mood Recorded!</Text>
+            <Text style={[styles.modalBody, isDarkMode ? styles.textGray : styles.textDark]}>You selected: <Text style={{fontWeight: 'bold'}}>{selectedMood}</Text>.</Text>
             <Pressable style={styles.primaryBtn} onPress={() => setMoodModalVisible(false)}><Text style={styles.btnText}>OK</Text></Pressable>
           </View>
         </View>
@@ -369,71 +469,122 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F8F5', padding: 16, paddingTop: 40 },
-  heroCard: { backgroundColor: '#174C3C', padding: 20, borderRadius: 14, alignItems: 'center', marginBottom: 15 },
-  heroSub: { color: '#A3C1AD', fontSize: 13, fontWeight: '600' },
-  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold', marginVertical: 4 },
-  heroDesc: { color: '#E2ECE9', fontSize: 12, marginBottom: 12, textAlign: 'center' },
-  progressBarBg: { width: '100%', height: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#F4D06F', borderRadius: 4 },
+  container: { flex: 1, padding: 14, paddingTop: 40 },
+  darkBg: { backgroundColor: '#0F172A' },
+  lightBg: { backgroundColor: '#F8FAFC' },
 
-  pinnedContainer: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 14, marginBottom: 15, elevation: 1 },
-  pinnedHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  pinnedTitle: { fontSize: 14, fontWeight: 'bold', color: '#174C3C' },
-  pinnedSub: { fontSize: 11, color: '#666', marginBottom: 10 },
-  timeBoxRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  timeBox: { flex: 1, backgroundColor: '#E2ECE9', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  timeNum: { fontSize: 20, fontWeight: 'bold', color: '#174C3C' },
-  timeLbl: { fontSize: 10, color: '#555', fontWeight: '600' },
+  darkCard: { backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 1 },
+  lightCard: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderWidth: 1 },
+  lightBanner: { backgroundColor: '#F0FDFA', borderColor: '#CCFBF1', borderWidth: 1 },
 
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#174C3C', marginBottom: 10, marginTop: 5 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15, marginBottom: 10 },
-  addPlusBtn: { backgroundColor: '#174C3C', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  darkSubCard: { backgroundColor: '#0F172A', borderColor: '#334155' },
+  darkNode: { backgroundColor: '#334155' },
 
-  moodContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  moodCard: { backgroundColor: '#FFFFFF', padding: 12, borderRadius: 14, alignItems: 'center', width: '22%', elevation: 1 },
-  selectedMoodCard: { borderWidth: 2, borderColor: '#174C3C', backgroundColor: '#E2ECE9' },
-  moodEmoji: { fontSize: 22, marginBottom: 4 },
-  moodLabel: { fontSize: 11, color: '#444', fontWeight: '500' },
+  quizTriggerBanner: { padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, elevation: 1 },
+  quizBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  quizIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#99F6E4', justifyContent: 'center', alignItems: 'center' },
+  quizBannerTitle: { fontSize: 14, fontWeight: 'bold' },
+  quizBannerSub: { color: '#64748B', fontSize: 10, marginTop: 1 },
 
-  listContainer: { gap: 10, marginBottom: 10 },
-  habitCard: { backgroundColor: '#FFFFFF', padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', elevation: 1 },
-  rehabCard: { backgroundColor: '#174C3C', padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', elevation: 1 },
-  checkBox: { width: 22, height: 22, borderWidth: 2, borderColor: '#174C3C', borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  checkedBox: { backgroundColor: '#174C3C' },
-  checkBoxWhite: { width: 22, height: 22, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  checkedBoxWhite: { backgroundColor: '#FFFFFF' },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#174C3C' },
-  completedText: { textDecorationLine: 'line-through', color: '#888' },
-  cardSub: { fontSize: 11, color: '#666', marginTop: 4 },
-  rehabTitle: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
-  completedTextWhite: { textDecorationLine: 'line-through', color: '#A3C1AD' },
-  rehabSub: { fontSize: 11, color: '#A3C1AD', marginTop: 4 },
-  actionRow: { flexDirection: 'row', alignItems: 'center' },
+  pinnedContainer: { padding: 14, borderRadius: 16, marginBottom: 12, elevation: 2 },
+  pinnedHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  pinnedTitle: { fontSize: 14, fontWeight: 'bold' },
+  
+  hugeDaysCard: { backgroundColor: '#7C3AED', paddingVertical: 18, borderRadius: 14, alignItems: 'center', marginBottom: 10, elevation: 2 },
+  hugeDaysNumber: { fontSize: 44, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1 },
+  hugeDaysLabel: { fontSize: 11, fontWeight: '700', color: '#DDD6FE', letterSpacing: 1.5, marginTop: 2 },
 
-  quizCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 14, marginTop: 15, marginBottom: 40, elevation: 1 },
-  quizQuestion: { fontSize: 13, fontWeight: 'bold', color: '#333', marginBottom: 8, marginTop: 10 },
-  quizRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  quizBtn: { flex: 1, paddingVertical: 8, borderWidth: 1, borderColor: '#E2ECE9', borderRadius: 8, alignItems: 'center' },
-  quizBtnSelected: { backgroundColor: '#174C3C', borderColor: '#174C3C' },
-  quizBtnText: { fontSize: 12, color: '#444', fontWeight: '600' },
+  timeBoxRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  timeBoxBlue: { flex: 1, backgroundColor: '#EFF6FF', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#DBEAFE' },
+  timeBoxPurple: { flex: 1, backgroundColor: '#F3E8FF', paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E9D5FF' },
+  timeNum: { fontSize: 18, fontWeight: 'bold' },
+  timeLbl: { fontSize: 10, color: '#64748B', fontWeight: '600' },
+
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
+  moodContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  moodCard: { padding: 8, borderRadius: 12, alignItems: 'center', width: '22%', elevation: 1 },
+  selectedMoodCard: { borderWidth: 2, borderColor: '#7C3AED' },
+  moodEmoji: { fontSize: 18, marginBottom: 2 },
+  moodLabel: { fontSize: 10, fontWeight: '500' },
+
+  balancedRow: { gap: 12, marginBottom: 15 },
+  
+  splitBoxRehab: { backgroundColor: '#065F46', padding: 14, borderRadius: 16, elevation: 2 },
+  splitHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  splitTitleWhite: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
+  splitSubGold: { fontSize: 11, color: '#FCD34D', fontWeight: '600' },
+  addBtnGold: { backgroundColor: '#FCD34D', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  progBgWhite: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
+  progFillGold: { height: '100%', backgroundColor: '#FCD34D', borderRadius: 3 },
+  itemCardRehab: { backgroundColor: 'rgba(255,255,255,0.12)', padding: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#047857' },
+  checkBoxWhite: { width: 18, height: 18, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: 5, justifyContent: 'center', alignItems: 'center' },
+  checkedWhite: { backgroundColor: '#FFFFFF' },
+  itemTextWhite: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
+  crossedText: { textDecorationLine: 'line-through', color: '#A7F3D0' },
+  itemSubLight: { fontSize: 10, color: '#D1FAE5', marginTop: 1 },
+
+  splitBoxHabit: { backgroundColor: '#1E40AF', padding: 14, borderRadius: 16, elevation: 2 },
+  splitTitleDark: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
+  splitSubBlue: { fontSize: 11, color: '#93C5FD', fontWeight: '600' },
+  addBtnBlue: { backgroundColor: '#93C5FD', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  progBgBlue: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
+  progFillBlue: { height: '100%', backgroundColor: '#93C5FD', borderRadius: 3 },
+  itemCardHabit: { backgroundColor: 'rgba(255,255,255,0.12)', padding: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#1D4ED8' },
+  checkBoxBlue: { width: 18, height: 18, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: 5, justifyContent: 'center', alignItems: 'center' },
+  checkedBlue: { backgroundColor: '#FFFFFF' },
+  itemTextDark: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
+  crossedTextDark: { textDecorationLine: 'line-through', color: '#93C5FD' },
+  itemSubGray: { fontSize: 10, color: '#DBEAFE', marginTop: 1 },
+
+  itemList: { gap: 8 },
+  actionIcons: { flexDirection: 'row', alignItems: 'center' },
+
+  statsCard: { padding: 16, borderRadius: 16, marginBottom: 40, elevation: 1 },
+  statsTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 2 },
+  timelineSub: { fontSize: 11, color: '#64748B', marginBottom: 12 },
+  timelineGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 },
+  timelineNode: { width: 38, height: 38, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  nodeCompleted: { backgroundColor: '#059669' },
+  nodePending: { backgroundColor: '#F1F5F9' },
+  nodeText: { fontSize: 10, fontWeight: 'bold', color: '#475569' },
+  progressText: { fontSize: 11, fontWeight: '600', color: '#059669', textAlign: 'center' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { padding: 20, borderRadius: 16, width: '88%', borderWidth: 1, borderColor: '#334155' },
+  modalContentSmall: { padding: 20, borderRadius: 14, width: '75%', alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  modalTitle: { fontSize: 17, fontWeight: 'bold' },
+  modalBody: { fontSize: 12, textAlign: 'center', marginBottom: 15 },
+  
+  quizCategoryTag: { fontSize: 10, fontWeight: 'bold', color: '#0D9488', marginTop: 4 },
+  quizQuestion: { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 4 },
+  quizRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
+  quizBtn: { flex: 1, paddingVertical: 6, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 6, alignItems: 'center', backgroundColor: '#F8FAFC' },
+  quizBtnGreen: { backgroundColor: '#059669', borderColor: '#059669' },
+  quizBtnRed: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  quizBtnBlue: { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' },
+  quizBtnText: { fontSize: 11, color: '#334155', fontWeight: '600' },
   quizBtnTextSelected: { color: '#FFFFFF' },
-  submitQuizBtn: { backgroundColor: '#174C3C', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  submitQuizBtn: { backgroundColor: '#0F766E', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   submitQuizText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  quizSuccess: { color: '#4E9F3D', fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginTop: 6 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#FFFFFF', padding: 22, borderRadius: 14, width: '85%' },
-  modalContentSmall: { backgroundColor: '#FFFFFF', padding: 22, borderRadius: 14, width: '75%', alignItems: 'center' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#174C3C', marginBottom: 15 },
-  modalBody: { fontSize: 13, color: '#555', textAlign: 'center', marginBottom: 20 },
-  inputLabel: { fontSize: 12, color: '#666', marginBottom: 4, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#E2ECE9', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 14 },
-  calendarTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#E2ECE9', padding: 12, borderRadius: 8, marginBottom: 20 },
-  calendarTriggerText: { color: '#174C3C', fontWeight: 'bold', fontSize: 14 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 5 },
-  primaryBtn: { backgroundColor: '#174C3C', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 },
-  btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  cancelBtn: { paddingVertical: 10, paddingHorizontal: 12 },
-  cancelText: { color: '#666' }
+  inputLabel: { fontSize: 11, color: '#64748B', marginBottom: 3, fontWeight: '600' },
+  input: { borderWidth: 1, padding: 8, borderRadius: 8, marginBottom: 10, fontSize: 13 },
+  darkInput: { borderColor: '#475569', backgroundColor: '#0F172A', color: '#FFFFFF' },
+  lightInput: { borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', color: '#000000' },
+
+  calendarTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, marginBottom: 15 },
+  calendarTriggerText: { fontWeight: 'bold', fontSize: 13 },
+  
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
+  primaryBtn: { backgroundColor: '#7C3AED', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6 },
+  btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
+  cancelBtn: { paddingVertical: 8, paddingHorizontal: 10 },
+  cancelText: { color: '#64748B', fontSize: 12 },
+
+  textWhite: { color: '#FFFFFF' },
+  textDark: { color: '#1E293B' },
+  textPurple: { color: '#A78BFA' },
+  textLightGreen: { color: '#34D399' },
+  textGray: { color: '#94A3B8' }
 });
