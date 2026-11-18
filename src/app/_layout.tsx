@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Stack } from 'expo-router';
+import { View, StyleSheet } from 'react-native';
 
 const ThemeContext = createContext({
   isDarkMode: true,
@@ -15,7 +16,15 @@ export default function RootLayout() {
 
   return (
     <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <View style={[styles.container, { backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC' }]}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </View>
     </ThemeContext.Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

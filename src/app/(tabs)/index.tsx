@@ -33,7 +33,7 @@ export default function HomeScreen() {
 
   // Pinned Special Counter State
   const [pinnedRehab, setPinnedRehab] = useState<PinnedRehab>({
-    title: 'Short-Form Videos Free',
+    title: 'DRUGS',
     startDate: '2026-11-15T00:00:00',
   });
   const [timeElapsed, setTimeElapsed] = useState({ days: 0, hours: 0, minutes: 0 });
@@ -181,7 +181,7 @@ export default function HomeScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.quizBannerTitle, isDarkMode ? styles.textWhite : styles.textDark]}>Daily Check-in Questionnaire</Text>
-            <Text style={styles.quizBannerSub}>Tap to answer questions & update progress scores</Text>
+            <Text style={styles.quizBannerSub}></Text>
           </View>
         </View>
         <Ionicons name="chevron-forward" size={18} color="#0F766E" />
