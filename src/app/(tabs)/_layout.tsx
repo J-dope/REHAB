@@ -1,21 +1,27 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../_layout';
 
 export default function TabLayout() {
+  const { isDarkMode } = useAppTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#174C3C',
-        tabBarInactiveTintColor: '#89958D',
+        tabBarActiveTintColor: isDarkMode ? '#34D399' : '#047857',
+        tabBarInactiveTintColor: isDarkMode ? '#64748B' : '#94A3B8',
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          height: 60,
+          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+          borderTopColor: isDarkMode ? '#1E293B' : '#E2E8F0',
           borderTopWidth: 1,
-          borderTopColor: '#E2ECE9',
-          paddingBottom: 5,
-          paddingTop: 5,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
         },
       }}
     >
@@ -24,25 +30,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="learn"
-        options={{
-          title: 'Learn',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="centres"
-        options={{
-          title: 'Centres',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="medical-outline" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -51,7 +39,25 @@ export default function TabLayout() {
         options={{
           title: 'Journal',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="journal-outline" size={size} color={color} />
+            <Ionicons name="book-outline" size={size} color={String(color)} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="learn"
+        options={{
+          title: 'Learn',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="compass-outline" size={size} color={String(color)} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="centres"
+        options={{
+          title: 'Centers',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="business-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -60,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={String(color)} />
           ),
         }}
       />
